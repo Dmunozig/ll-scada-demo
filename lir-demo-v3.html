@@ -180,6 +180,8 @@
   .modal-close { position: absolute; top: 10px; right: 12px; cursor: pointer; font-size: 16px; color: #64748b; background: none; border: none; line-height: 1; padding: 4px 6px; }
   .modal-close:hover { color: #1e293b; }
   .la.crit.expandable { cursor: pointer; }
+  .img-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 600; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+  .img-modal-img { max-width: 88vw; max-height: 88vh; border-radius: 12px; display: block; box-shadow: 0 24px 80px rgba(0,0,0,0.5); }
 </style>
 </head>
 <body>
@@ -442,7 +444,7 @@ function renderL(){
   let h=`<div class="lir-hdr"><div class="lir-dot"></div><span class="lir-txt">Lir Biological Intelligence</span><span class="live">LIVE</span></div>`;
 
   // Critical alert — red, expandable on click
-  h+=`<div class="la crit expandable" onclick="toggleSVIAlert(this)"><div class="la-icon">${iconAlertCircle('#dc2626')}</div><div class="la-content"><div class="la-t">SVI Projected to Exceed 150 in 48hrs</div><div class="la-d">Filamentous bacteria density +62% / 24h. Elongated filaments consistent with M. parvicella.</div><div class="la-a">⚡ Increase PAC to 8.5 g/L · Adjust DO to 2.3 mg/L</div><div class="floc-imgs" style="display:none"><img class="floc-img" src="microscopy_images/Floc1_annotated.png" onmouseover="this.src='microscopy_images/Floc1_unannotated.png'" onmouseout="this.src='microscopy_images/Floc1_annotated.png'"><img class="floc-img" src="microscopy_images/Floc2_annotated.png" onmouseover="this.src='microscopy_images/Floc2_unannotated.png'" onmouseout="this.src='microscopy_images/Floc2_annotated.png'"></div></div></div>`;
+  h+=`<div class="la crit expandable" onclick="toggleSVIAlert(this)"><div class="la-icon">${iconAlertCircle('#dc2626')}</div><div class="la-content"><div class="la-t">SVI Projected to Exceed 150 in 48hrs</div><div class="la-d">Filamentous bacteria density +62% / 24h. Elongated filaments consistent with M. parvicella.</div><div class="la-a">⚡ Increase PAC to 8.5 g/L · Adjust DO to 2.3 mg/L</div><div class="floc-imgs" style="display:none"><img class="floc-img" src="microscopy_images/Floc1_annotated.png" onmouseover="this.src='microscopy_images/Floc1_unannotated.png'" onmouseout="this.src='microscopy_images/Floc1_annotated.png'" onclick="event.stopPropagation();openImgModal(this.src)"><img class="floc-img" src="microscopy_images/Floc2_annotated.png" onmouseover="this.src='microscopy_images/Floc2_unannotated.png'" onmouseout="this.src='microscopy_images/Floc2_annotated.png'" onclick="event.stopPropagation();openImgModal(this.src)"></div></div></div>`;
 
   // Warning alert — amber, AlertTriangle icon
   h+=`<div class="la warn"><div class="la-icon">${iconAlertTriangle('#d97706')}</div><div class="la-content"><div class="la-t">Foam Risk ${lfm}% — Elevated</div><div class="la-d">Surface imaging detects foam precursors. Action within 12h.</div></div></div>`;
@@ -467,6 +469,14 @@ function renderL(){
   document.getElementById('lir-inner').innerHTML=h;
 }
 
+function openImgModal(src){
+  const m=document.createElement('div');
+  m.className='img-modal-overlay';
+  m.innerHTML=`<img class="img-modal-img" src="${src}">`;
+  m.addEventListener('click',()=>m.remove());
+  document.body.appendChild(m);
+}
+
 function toggleSVIAlert(el){
   const imgs=el.querySelector('.floc-imgs');
   if(!imgs) return;
@@ -474,44 +484,52 @@ function toggleSVIAlert(el){
 }
 
 function flocImgPair(){
-  return `<div class="floc-imgs"><img class="floc-img" src="microscopy_images/Floc1_annotated.png" onmouseover="this.src='microscopy_images/Floc1_unannotated.png'" onmouseout="this.src='microscopy_images/Floc1_annotated.png'"><img class="floc-img" src="microscopy_images/Floc2_annotated.png" onmouseover="this.src='microscopy_images/Floc2_unannotated.png'" onmouseout="this.src='microscopy_images/Floc2_annotated.png'"></div>`;
+  return `<div class="floc-imgs"><img class="floc-img" src="microscopy_images/Floc1_annotated.png" onmouseover="this.src='microscopy_images/Floc1_unannotated.png'" onmouseout="this.src='microscopy_images/Floc1_annotated.png'" onclick="event.stopPropagation();openImgModal(this.src)"><img class="floc-img" src="microscopy_images/Floc2_annotated.png" onmouseover="this.src='microscopy_images/Floc2_unannotated.png'" onmouseout="this.src='microscopy_images/Floc2_annotated.png'" onclick="event.stopPropagation();openImgModal(this.src)"></div>`;
 }
 
 function flocTrendChart(){
   const W=500,H=200,pl=42,pr=10,pt=24,pb=24;
   const pW=W-pl-pr,pH=H-pt-pb;
-  const sMin=0,sMax=320;
-  const sX=s=>pl+Math.max(0,Math.min(1,(s-sMin)/(sMax-sMin)))*pW;
-  const T=48;
-  const tY=t=>pt+(t/(T-1))*pH;
-  // Mode shifts 70→138µm, spread grows 18→72µm (worsening SVI trend)
-  const mode=t=>70+(t/(T-1))*68;
-  const sigma=t=>18+(t/(T-1))*54;
+  const sMin=0,sMax=280;
+  const sY=s=>pt+pH-Math.max(0,Math.min(1,(s-sMin)/(sMax-sMin)))*pH;
+  const T=60;
+  const tX=t=>pl+(t/(T-1))*pW;
+
+  // Jagged random walk — small upward drift with noise
+  const mArr=new Array(T); mArr[0]=92;
+  for(let t=1;t<T;t++) mArr[t]=Math.max(68,Math.min(148,mArr[t-1]+0.32+(Math.random()-.5)*11));
+  const sArr=new Array(T); sArr[0]=22;
+  for(let t=1;t<T;t++) sArr[t]=Math.max(16,Math.min(55,sArr[t-1]+0.18+(Math.random()-.5)*3.5));
+
+  // Smooth band edges but keep median raw/jagged
+  const smth=(a,k)=>a.map((_,i)=>{let s=0,c=0;for(let j=Math.max(0,i-k);j<=Math.min(a.length-1,i+k);j++){s+=a[j];c++;}return s/c;});
+  const mS=smth(mArr,5), sS=smth(sArr,4);
+
   let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">`;
   svg+=`<rect x="${pl}" y="${pt}" width="${pW}" height="${pH}" fill="#f8fafc"/>`;
-  // vertical grid
-  [50,100,150,200,250,300].forEach(sz=>{
-    const x=sX(sz);
-    svg+=`<line x1="${x}" y1="${pt}" x2="${x}" y2="${pt+pH}" stroke="#e2e8f0" stroke-width="0.5"/>`;
+  // Horizontal grid lines (size)
+  [50,100,150,200,250].forEach(sz=>{
+    const y=sY(sz);
+    svg+=`<line x1="${pl}" y1="${y}" x2="${pl+pW}" y2="${y}" stroke="#e2e8f0" stroke-width="0.5"/>`;
+    svg+=`<text x="${pl-4}" y="${y+3}" text-anchor="end" font-size="7" fill="#9ca3af" font-family="'DM Mono',monospace">${sz}</text>`;
   });
-  // bands outermost→innermost, each a polygon (left edge top→bottom, right edge bottom→top)
+
+  // Bands outermost→innermost: top edge left→right, bottom edge right→left
   [[3.5,0.09],[2.8,0.13],[2.1,0.18],[1.5,0.23],[0.9,0.29],[0.35,0.38]].forEach(([z,op])=>{
     let pts='';
-    for(let t=0;t<T;t++) pts+=`${sX(Math.max(sMin,mode(t)-sigma(t)*z)).toFixed(1)},${tY(t).toFixed(1)} `;
-    for(let t=T-1;t>=0;t--) pts+=`${sX(Math.min(sMax,mode(t)+sigma(t)*z)).toFixed(1)},${tY(t).toFixed(1)} `;
+    for(let t=0;t<T;t++) pts+=`${tX(t).toFixed(1)},${sY(Math.min(sMax,mS[t]+sS[t]*z)).toFixed(1)} `;
+    for(let t=T-1;t>=0;t--) pts+=`${tX(t).toFixed(1)},${sY(Math.max(sMin,mS[t]-sS[t]*z)).toFixed(1)} `;
     svg+=`<polygon points="${pts}" fill="#3b82f6" opacity="${op}"/>`;
   });
-  // median line
-  const mpts=Array.from({length:T},(_,t)=>`${sX(mode(t)).toFixed(1)},${tY(t).toFixed(1)}`).join(' ');
-  svg+=`<polyline points="${mpts}" fill="none" stroke="#1e40af" stroke-width="1.2" opacity="0.75"/>`;
-  // x-axis size labels
-  [50,100,150,200,250,300].forEach(sz=>{
-    svg+=`<text x="${sX(sz)}" y="${H-6}" text-anchor="middle" font-size="8" fill="#9ca3af" font-family="'DM Mono',monospace">${sz}µm</text>`;
-  });
-  // y-axis time labels
-  svg+=`<text x="${pl-4}" y="${pt+6}" text-anchor="end" font-size="7" fill="#9ca3af">−24h</text>`;
-  svg+=`<text x="${pl-4}" y="${pt+pH+4}" text-anchor="end" font-size="7" fill="#9ca3af">now</text>`;
-  // legend
+
+  // Jagged median — raw random walk values
+  const mpts=mArr.map((v,t)=>`${tX(t).toFixed(1)},${sY(v).toFixed(1)}`).join(' ');
+  svg+=`<polyline points="${mpts}" fill="none" stroke="#1e40af" stroke-width="1.1" opacity="0.75"/>`;
+
+  // X-axis time labels
+  svg+=`<text x="${pl}" y="${H-6}" text-anchor="middle" font-size="8" fill="#9ca3af">−24h</text>`;
+  svg+=`<text x="${pl+pW}" y="${H-6}" text-anchor="middle" font-size="8" fill="#9ca3af">now</text>`;
+  svg+=`<text x="${pl-4}" y="${pt}" text-anchor="end" font-size="7" fill="#9ca3af">µm</text>`;
   svg+=`<text x="${pl+6}" y="${pt+11}" font-size="8" fill="#64748b" font-family="'DM Sans',sans-serif">50% distribution</text>`;
   svg+=`<text x="${pl+6}" y="${pt+21}" font-size="8" fill="#64748b" font-family="'DM Sans',sans-serif">Median</text>`;
   svg+='</svg>';
@@ -531,7 +549,7 @@ function openFlocModal(){
 }
 
 function filamentImgPair(){
-  return `<div class="floc-imgs"><img class="floc-img" src="microscopy_images/Filament1_annotated.png" onmouseover="this.src='microscopy_images/Filament1_unannotated.png'" onmouseout="this.src='microscopy_images/Filament1_annotated.png'"><img class="floc-img" src="microscopy_images/Filament2_annotated.png" onmouseover="this.src='microscopy_images/Filament2_unannotated.png'" onmouseout="this.src='microscopy_images/Filament2_annotated.png'"></div>`;
+  return `<div class="floc-imgs"><img class="floc-img" src="microscopy_images/Filament1_annotated.png" onmouseover="this.src='microscopy_images/Filament1_unannotated.png'" onmouseout="this.src='microscopy_images/Filament1_annotated.png'" onclick="event.stopPropagation();openImgModal(this.src)"><img class="floc-img" src="microscopy_images/Filament2_annotated.png" onmouseover="this.src='microscopy_images/Filament2_unannotated.png'" onmouseout="this.src='microscopy_images/Filament2_annotated.png'" onclick="event.stopPropagation();openImgModal(this.src)"></div>`;
 }
 
 function openFIModal(){
