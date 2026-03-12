@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lir Labs — Plant Dashboard Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', system-ui, sans-serif; background: #d4d0c8; min-height: 100vh; overflow-x: hidden; }
+
+  /* ======== HEADER — old school title bar ======== */
+  .header {
+    background: linear-gradient(180deg, #0a246a 0%, #3a6ea5 100%);
+    padding: 0 8px; height: 28px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+  .header-left { display: flex; align-items: center; gap: 8px; }
+  .header-icon { width: 16px; height: 16px; }
+  .header-title { font-size: 12px; font-weight: 700; color: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; letter-spacing: 0; text-shadow: 1px 1px 1px rgba(0,0,0,0.4); }
+  .header-right { display: flex; align-items: center; gap: 6px; }
+  .clock { font-size: 11px; color: #fff; font-family: 'DM Mono', 'Courier New', monospace; text-shadow: 1px 1px 1px rgba(0,0,0,0.3); }
+
+  /* Toggle — sits in header as a modern element hinting at Lir */
+  .toggle-btn { display: flex; align-items: center; gap: 8px; padding: 3px 4px 3px 10px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); cursor: pointer; transition: all 0.3s; user-select: none; }
+  .toggle-btn.active { border-color: #7dd3fc; background: rgba(14,165,233,0.2); }
+  .toggle-label { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.8); transition: color 0.3s; }
+  .toggle-btn.active .toggle-label { color: #fff; }
+  .toggle-track { width: 32px; height: 16px; border-radius: 8px; padding: 2px; background: rgba(255,255,255,0.25); transition: background 0.3s; }
+  .toggle-btn.active .toggle-track { background: linear-gradient(135deg, #0ea5e9, #06b6d4); }
+  .toggle-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: transform 0.3s; }
+  .toggle-btn.active .toggle-thumb { transform: translateX(16px); }
+
+  /* ======== MENU BAR — classic Win32 ======== */
+  .menubar {
+    background: #ece9d8; border-bottom: 1px solid #aca899; padding: 0 4px;
+    display: flex; align-items: center; height: 22px; gap: 0;
+    font-size: 11px; font-family: Tahoma, 'Segoe UI', sans-serif; color: #000;
+  }
+  .menu-item { padding: 2px 8px; cursor: default; }
+  .menu-item:hover { background: #316ac5; color: #fff; }
+  .menubar-right { margin-left: auto; font-size: 10px; color: #444; display: flex; gap: 12px; align-items: center; }
+  .menubar-right span { font-family: 'DM Mono', 'Courier New', monospace; }
+
+  /* ======== LAYOUT ======== */
+  .layout { display: flex; min-height: calc(100vh - 50px); }
+  .scada-panel { flex: 1; min-width: 0; background: #d4d0c8; padding: 6px; transition: flex 0.5s ease; }
+  .lir-panel { width: 0; opacity: 0; overflow: hidden; transition: width 0.5s ease, opacity 0.4s ease 0.1s; flex-shrink: 0; background: #fafafa; border-left: none; }
+  .lir-panel.open { width: 33.333%; opacity: 1; border-left: 1px solid #ececec; }
+  .lir-inner { min-width: 310px; padding: 20px 20px; }
+
+  /* ======== SCADA STYLING — Win32 / industrial ======== */
+  /* Classic inset/outset borders */
+  .scada-group {
+    border: 2px solid; border-color: #fff #808080 #808080 #fff;
+    background: #d4d0c8; margin-bottom: 6px; padding: 0;
+  }
+  .scada-group-title {
+    background: linear-gradient(180deg, #0a246a 0%, #3a6ea5 100%);
+    color: #fff; font-size: 11px; font-weight: 700; padding: 2px 6px;
+    font-family: Tahoma, sans-serif; text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .scada-group-body { padding: 8px; }
+
+  /* Metrics — digital display style */
+  .scada-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 6px; }
+  .scada-metric {
+    border: 2px solid; border-color: #808080 #fff #fff #808080;
+    background: #000; padding: 6px 8px;
+  }
+  .scada-metric-label { font-size: 9px; color: #00ff00; font-family: 'DM Mono', 'Courier New', monospace; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; }
+  .scada-metric-row { display: flex; align-items: baseline; gap: 4px; margin-top: 2px; }
+  .scada-metric-value { font-size: 22px; font-weight: 700; color: #00ff00; font-family: 'DM Mono', 'Courier New', monospace; letter-spacing: -0.02em; text-shadow: 0 0 8px rgba(0,255,0,0.4); }
+  .scada-metric-unit { font-size: 10px; color: #00aa00; font-family: 'DM Mono', monospace; }
+  .scada-metric-trend { font-size: 9px; font-family: 'DM Mono', monospace; }
+  .smt-up { color: #ff4444; text-shadow: 0 0 6px rgba(255,68,68,0.4); }
+  .smt-dn { color: #44ff44; text-shadow: 0 0 6px rgba(68,255,68,0.4); }
+
+  /* Chart area — black background, green traces */
+  .scada-charts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .scada-chart-box {
+    border: 2px solid; border-color: #808080 #fff #fff #808080;
+    background: #0a0a0a; padding: 6px;
+  }
+  .scada-chart-label { font-size: 9px; color: #888; font-family: Tahoma, sans-serif; margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .scada-chart-label span { color: #666; }
+
+  /* Blind spots — old-school warning */
+  .scada-blind {
+    border: 2px solid; border-color: #808080 #fff #fff #808080;
+    background: #d4d0c8; margin-top: 4px; position: relative;
+  }
+  .scada-blind-title {
+    background: #800000; color: #fff; font-size: 10px; font-weight: 700;
+    padding: 2px 6px; font-family: Tahoma, sans-serif;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .scada-blind-body { padding: 8px; font-size: 10px; color: #333; font-family: Tahoma, sans-serif; line-height: 1.5; }
+  .scada-blind-body strong { color: #000; }
+  .scada-blind-overlay {
+    position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(128,0,0,0.06) 6px, rgba(128,0,0,0.06) 12px);
+    border: 2px dashed #cc0000;
+  }
+
+  /* Status bar */
+  .statusbar {
+    background: #ece9d8; border-top: 1px solid #fff; padding: 2px 8px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 10px; font-family: Tahoma, sans-serif; color: #444;
+  }
+  .statusbar-item { border: 1px solid; border-color: #808080 #fff #fff #808080; padding: 1px 6px; background: #d4d0c8; }
+  .status-led { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .led-green { background: #00cc00; box-shadow: 0 0 4px #00cc00; }
+  .led-amber { background: #ccaa00; box-shadow: 0 0 4px #ccaa00; }
+
+  /* ======== LIR PANEL — sleek light UI ======== */
+  .lir-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #ececec; }
+  .lir-dot { width: 8px; height: 8px; border-radius: 50%; background: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 3px rgba(37,99,235,0.15)} 50%{box-shadow:0 0 0 6px rgba(37,99,235,0.08)} }
+  .lir-txt { font-size: 13px; font-weight: 700; color: #0f172a; font-family: 'DM Sans', sans-serif; letter-spacing: -0.01em; }
+  .live { font-size: 9px; background: #dbeafe; color: #2563eb; padding: 2px 8px; border-radius: 10px; font-weight: 600; letter-spacing: 0.04em; }
+
+  .badge { font-size: 9px; font-weight: 600; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  .b-alert { background: #fee2e2; color: #dc2626; }
+  .b-warn { background: #fef3c7; color: #d97706; }
+  .b-ok { background: #dcfce7; color: #16a34a; }
+
+  /* Alerts — shadcn-style */
+  .la { border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; border: 1px solid; }
+  .la.crit { background: #fef2f2; border-color: #fecaca; }
+  .la.warn { background: #fffbeb; border-color: #fde68a; }
+  .la.ok   { background: #f0fdf4; border-color: #bbf7d0; }
+  .la-icon { flex-shrink: 0; margin-top: 1px; }
+  .la-content { flex: 1; min-width: 0; }
+  .la-t { font-weight: 600; font-size: 11px; line-height: 1.4; margin-bottom: 2px; }
+  .la.crit .la-t { color: #991b1b; }
+  .la.warn .la-t { color: #92400e; }
+  .la.ok   .la-t { color: #166534; }
+  .la-d { font-size: 10px; line-height: 1.5; }
+  .la.crit .la-d { color: #b91c1c; }
+  .la.warn .la-d { color: #b45309; }
+  .la.ok   .la-d { color: #15803d; }
+  .la-a { margin-top: 6px; font-size: 10px; font-weight: 600; color: #dc2626; background: #fee2e2; display: inline-block; padding: 3px 10px; border-radius: 5px; }
+
+  .cc { background: #ffffff; border-radius: 14px; padding: 14px; border: 1px solid #dfdfdf; margin-bottom: 14px; box-shadow: 0 0 0 3px #fafafa, 0 0 0 4px #ececec; }
+  .cc.lb { border-color: #dfdfdf; }
+  .cc-title { font-size: 11px; font-weight: 600; color: #1e293b; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; font-family: 'DM Sans', sans-serif; }
+  .cc-note { margin-top: 6px; font-size: 10px; color: #64748b; line-height: 1.5; font-family: 'DM Sans', sans-serif; }
+  .cc-note strong { color: #1e293b; }
+  .cc-note .red { color: #dc2626; font-weight: 700; }
+
+  .recs { background: #ffffff; border-radius: 14px; padding: 12px 14px; border: 1px solid #dfdfdf; margin-top: 8px; box-shadow: 0 0 0 3px #fafafa, 0 0 0 4px #ececec; }
+  .recs-t { font-size: 11px; font-weight: 700; color: #2563eb; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; font-family: 'DM Sans', sans-serif; }
+  .ri { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+  .ri:last-child { margin-bottom: 0; }
+  .rn { width: 20px; height: 20px; border-radius: 50%; background: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 9px; font-weight: 700; color: #fff; font-family: 'DM Sans', sans-serif; }
+  .rm { font-size: 11px; font-weight: 600; color: #1e293b; font-family: 'DM Sans', sans-serif; }
+  .rs { font-size: 10px; color: #64748b; margin-top: 1px; line-height: 1.3; font-family: 'DM Sans', sans-serif; }
+
+  @media (max-width: 1000px) {
+    .scada-metrics { grid-template-columns: repeat(2,1fr); }
+    .scada-charts { grid-template-columns: 1fr; }
+    .lir-panel.open { width: 40%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Title bar -->
+<div class="header">
+  <div class="header-left">
+    <svg class="header-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="2" stroke="#fff" stroke-width="1.5"/><circle cx="8" cy="8" r="3" stroke="#fff" stroke-width="1"/><line x1="8" y1="2" x2="8" y2="5" stroke="#fff" stroke-width="1"/><line x1="8" y1="11" x2="8" y2="14" stroke="#fff" stroke-width="1"/><line x1="2" y1="8" x2="5" y2="8" stroke="#fff" stroke-width="1"/><line x1="11" y1="8" x2="14" y2="8" stroke="#fff" stroke-width="1"/></svg>
+    <span class="header-title">SCADA Control — Municipal WWTP 50,000 PE</span>
+  </div>
+  <div class="header-right">
+    <span class="clock" id="clock"></span>
+    <button class="toggle-btn" id="tbtn" onclick="toggle()">
+      <span class="toggle-label" id="tlbl">Enable Lir</span>
+      <div class="toggle-track"><div class="toggle-thumb" id="tthumb"></div></div>
+    </button>
+  </div>
+</div>
+
+<!-- Menu bar -->
+<div class="menubar">
+  <span class="menu-item">File</span>
+  <span class="menu-item">View</span>
+  <span class="menu-item">Process</span>
+  <span class="menu-item">Alarms</span>
+  <span class="menu-item">Reports</span>
+  <span class="menu-item">Tools</span>
+  <span class="menu-item">Help</span>
+  <div class="menubar-right">
+    <span>PLC: CONNECTED</span>
+    <span>SCADA v4.2.1</span>
+  </div>
+</div>
+
+<!-- Main layout -->
+<div class="layout">
+  <div class="scada-panel" id="scada"></div>
+  <div class="lir-panel" id="lir"><div class="lir-inner" id="lir-inner"></div></div>
+</div>
+
+<script>
+function g(h,fn,n){const now=new Date();return Array.from({length:h},(_,i)=>({time:new Date(now.getTime()-(h-i)*36e5).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),hour:i,value:fn(i)+(Math.random()-.5)*n}))}
+const doD=g(48,i=>1.8+.4*Math.sin(i/6),.15),nh4D=g(48,i=>2.5+1.2*Math.sin(i/8+1),.3),flD=g(48,i=>420+80*Math.sin(i/12),15),enD=g(48,i=>145+30*Math.sin(i/10),8);
+const fiD=g(48,i=>18+i*.6+3*Math.sin(i/5),1.5),svA=g(36,i=>95+i*1.1+5*Math.sin(i/7),3);
+const lsv=svA[svA.length-1].value;
+const svF=Array.from({length:12},(_,i)=>({time:'+'+(i+1)*2+'h',hour:36+i,value:lsv+(i+1)*2.8+(Math.random()-.5)*2,upper:lsv+(i+1)*3.8+5,lower:lsv+(i+1)*1.8-3}));
+const fcD=[{l:'10-30µm',c:5},{l:'30-60µm',c:12},{l:'60-100µm',c:28},{l:'100-150µm',c:35},{l:'150-200µm',c:22},{l:'200-300µm',c:14},{l:'300+µm',c:6}];
+const fmD=g(48,i=>15+i*.8+4*Math.sin(i/6),2);
+const lfi=fiD[fiD.length-1].value.toFixed(1),lsvi=svA[svA.length-1].value.toFixed(0),lfm=fmD[fmD.length-1].value.toFixed(0);
+
+// SCADA-style green-on-black chart
+function schrt(d,color,o={}){
+  const{threshold:th=null,thresholdLabel:tl='',height:H=100,yLabel:yl=''}=o;
+  const av=d.map(x=>x.value);if(th!==null)av.push(th);
+  const mn=Math.min(...av)*.9,mx=Math.max(...av)*1.1,rn=mx-mn||1;
+  const W=500,p={t:8,r:8,b:16,l:34},pW=W-p.l-p.r,pH=H-p.t-p.b;
+  const tX=i=>p.l+(i/(d.length-1))*pW,tY=v=>p.t+pH-((v-mn)/rn)*pH;
+  let s=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">`;
+  // Grid — dark green
+  [.25,.5,.75].forEach(f=>{s+=`<line x1="${p.l}" y1="${p.t+pH*f}" x2="${W-p.r}" y2="${p.t+pH*f}" stroke="#1a3a1a" stroke-width="0.5"/>`;});
+  for(let i=0;i<d.length;i+=Math.floor(d.length/8)){s+=`<line x1="${tX(i)}" y1="${p.t}" x2="${tX(i)}" y2="${p.t+pH}" stroke="#1a3a1a" stroke-width="0.5"/>`;}
+  // Y labels
+  [0,.5,1].forEach(f=>{s+=`<text x="${p.l-3}" y="${p.t+pH*(1-f)+3}" text-anchor="end" font-size="8" fill="#446644" font-family="'Courier New',monospace">${(mn+rn*f).toFixed(0)}</text>`;});
+  if(yl)s+=`<text x="8" y="${p.t+pH/2}" text-anchor="middle" font-size="7" fill="#446644" font-family="'Courier New',monospace" transform="rotate(-90,8,${p.t+pH/2})">${yl}</text>`;
+  // Threshold
+  if(th!==null){s+=`<line x1="${p.l}" y1="${tY(th)}" x2="${W-p.r}" y2="${tY(th)}" stroke="#aa2222" stroke-width="1" stroke-dasharray="4,3"/>`;if(tl)s+=`<text x="${W-p.r}" y="${tY(th)-3}" text-anchor="end" font-size="7" fill="#aa2222" font-family="'Courier New',monospace">${tl}</text>`;}
+  // Trace
+  s+=`<polyline points="${d.map((x,i)=>`${tX(i)},${tY(x.value)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="1.5" filter="url(#glow)"/>`;
+  // Glow filter
+  s+=`<defs><filter id="glow"><feGaussianBlur stdDeviation="2" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+  // Time labels
+  const st=Math.floor(d.length/6);d.forEach((x,i)=>{if(i%st===0)s+=`<text x="${tX(i)}" y="${H-2}" text-anchor="middle" font-size="7" fill="#446644" font-family="'Courier New',monospace">${x.time}</text>`;});
+  return s+'</svg>';}
+
+// Modern Lir chart (clean, blue tones)
+function lchrt(d,c,o={}){
+  const{threshold:th=null,thresholdLabel:tl='',forecastData:fd=null,showConfidence:sc=false,yLabel:yl='',height:H=95}=o;
+  const av=[...d.map(x=>x.value),...(fd?fd.map(x=>x.value):[])];if(th!==null)av.push(th);
+  const mn=Math.min(...av)*.9,mx=Math.max(...av)*1.1,rn=mx-mn||1,tot=d.length+(fd?fd.length:0);
+  const W=500,p={t:10,r:10,b:18,l:36},pW=W-p.l-p.r,pH=H-p.t-p.b;
+  const tX=i=>p.l+(i/(tot-1))*pW,tY=v=>p.t+pH-((v-mn)/rn)*pH;
+  let s=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">`;
+  [.25,.5,.75].forEach(f=>{s+=`<line x1="${p.l}" y1="${p.t+pH*f}" x2="${W-p.r}" y2="${p.t+pH*f}" stroke="#e5e7eb" stroke-width="0.5"/>`;});
+  [0,.5,1].forEach(f=>{s+=`<text x="${p.l-4}" y="${p.t+pH*(1-f)+4}" text-anchor="end" font-size="9" fill="#9ca3af">${(mn+rn*f).toFixed(0)}</text>`;});
+  if(yl)s+=`<text x="10" y="${p.t+pH/2}" text-anchor="middle" font-size="8" fill="#9ca3af" transform="rotate(-90,10,${p.t+pH/2})">${yl}</text>`;
+  if(th!==null){s+=`<line x1="${p.l}" y1="${tY(th)}" x2="${W-p.r}" y2="${tY(th)}" stroke="#ef4444" stroke-width="1" stroke-dasharray="6,4"/>`;if(tl)s+=`<text x="${W-p.r}" y="${tY(th)-4}" text-anchor="end" font-size="8" fill="#ef4444">${tl}</text>`;}
+  if(sc&&fd){const u=fd.map((x,i)=>`${tX(d.length+i)},${tY(x.upper)}`).join(' '),l=[...fd].reverse().map((x,i)=>`${tX(d.length+fd.length-1-i)},${tY(x.lower)}`).join(' ');s+=`<polygon points="${u} ${l}" fill="${c}" opacity="0.1"/>`;}
+  s+=`<polyline points="${d.map((x,i)=>`${tX(i)},${tY(x.value)}`).join(' ')}" fill="none" stroke="${c}" stroke-width="2"/>`;
+  if(fd){s+=`<polyline points="${tX(d.length-1)},${tY(d[d.length-1].value)} ${fd.map((x,i)=>`${tX(d.length+i)},${tY(x.value)}`).join(' ')}" fill="none" stroke="${c}" stroke-width="2" stroke-dasharray="6,4" opacity="0.7"/>`;
+  s+=`<line x1="${tX(d.length-1)}" y1="${p.t}" x2="${tX(d.length-1)}" y2="${p.t+pH}" stroke="#d1d5db" stroke-width="1" stroke-dasharray="3,3"/>`;
+  s+=`<text x="${tX(d.length+2)}" y="${p.t+10}" font-size="8" fill="#9ca3af">forecast →</text>`;}
+  const st=Math.floor(d.length/5);d.forEach((x,i)=>{if(i%st===0)s+=`<text x="${tX(i)}" y="${H-2}" text-anchor="middle" font-size="8" fill="#9ca3af">${x.time}</text>`;});
+  return s+'</svg>';}
+
+function lbar(d,c){const mx=Math.max(...d.map(x=>x.c)),W=500,H=80,p={t:6,r:10,b:20,l:30},pW=W-p.l-p.r,pH=H-p.t-p.b,bW=pW/d.length*.7,gap=pW/d.length*.3;
+let s=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">`;
+d.forEach((x,i)=>{const bH=(x.c/mx)*pH,xp=p.l+i*(bW+gap)+gap/2,y=p.t+pH-bH;
+s+=`<rect x="${xp}" y="${y}" width="${bW}" height="${bH}" fill="${c}" rx="3" opacity="0.8"/>`;
+s+=`<text x="${xp+bW/2}" y="${H-3}" text-anchor="middle" font-size="7" fill="#9ca3af">${x.l}</text>`;
+s+=`<text x="${xp+bW/2}" y="${y-2}" text-anchor="middle" font-size="8" fill="#6b7280">${x.c}%</text>`;});
+return s+'</svg>';}
+
+let on=false;
+function toggle(){
+  on=!on;
+  document.getElementById('tbtn').className=on?'toggle-btn active':'toggle-btn';
+  document.getElementById('tlbl').textContent=on?'Lir Active':'Enable Lir';
+  document.getElementById('lir').className=on?'lir-panel open':'lir-panel';
+  renderS();renderL();
+}
+
+function renderS(){
+  let h='';
+
+  // Digital metrics
+  h+=`<div class="scada-metrics">`;
+  [{l:'DO',v:'1.92',u:'mg/L',t:null},{l:'NH4-N',v:'2.81',u:'mg/L',t:'↓0.3'},{l:'FLOW',v:'438',u:'m³/h',t:null},{l:'ENERGY',v:'152',u:'kWh',t:'↑4%'}].forEach(m=>{
+    const tc=m.t&&(m.t[0]==='↑'||m.t[0]==='+')?'smt-up':'smt-dn';
+    h+=`<div class="scada-metric"><div class="scada-metric-label">${m.l}</div><div class="scada-metric-row"><span class="scada-metric-value">${m.v}</span><span class="scada-metric-unit">${m.u}</span>${m.t?`<span class="scada-metric-trend ${tc}">${m.t}</span>`:''}</div></div>`;
+  });
+  h+='</div>';
+
+  // Process Trends group
+  h+=`<div class="scada-group"><div class="scada-group-title"><span>Process Trends — 48h</span><span style="font-size:9px;opacity:0.7">AUTO-REFRESH: 5s</span></div><div class="scada-group-body">`;
+  h+='<div class="scada-charts">';
+  h+=`<div class="scada-chart-box"><div class="scada-chart-label">Dissolved Oxygen — Zones 1-5 <span>mg/L</span></div>${schrt(doD,'#00dd00',{yLabel:'mg/L'})}</div>`;
+  h+=`<div class="scada-chart-box"><div class="scada-chart-label">Ammonium NH4-N — Effluent <span>mg/L</span></div>${schrt(nh4D,'#00ccff',{threshold:4,thresholdLabel:'CONSENT',yLabel:'mg/L'})}</div>`;
+  h+=`<div class="scada-chart-box"><div class="scada-chart-label">Aeration Energy <span>kWh</span></div>${schrt(enD,'#ffaa00',{yLabel:'kWh'})}</div>`;
+  h+=`<div class="scada-chart-box"><div class="scada-chart-label">Influent Flow <span>m³/h</span></div>${schrt(flD,'#00dd00',{yLabel:'m³/h'})}</div>`;
+  h+='</div></div></div>';
+
+  // Blind spots (always visible — the point is they persist even with Lir on)
+  if(!on){
+    h+=`<div class="scada-blind"><div class="scada-blind-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="17" r="0.5"/></svg>DATA GAP: Sludge Volume Index (SVI)</div>
+    <div class="scada-blind-body"><strong>Last reading: 118 mL/g</strong> — sampled 5 days ago<br>Frequency: 1x weekly manual grab sample<br>Next scheduled: 2 days<br><br>⚠ No continuous monitoring. Changes between samples are undetected.</div>
+    <div class="scada-blind-overlay"></div></div>`;
+
+    h+=`<div class="scada-blind"><div class="scada-blind-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="17" r="0.5"/></svg>DATA GAP: Chemical Dosing — PAC</div>
+    <div class="scada-blind-body"><strong>Fixed rate: 6.0 g/L</strong> — last adjusted 2 weeks ago<br>Mode: constant (operator-set)<br>No link to biological state. No predictive dosing capability.</div>
+    <div class="scada-blind-overlay"></div></div>`;
+
+    h+=`<div class="scada-blind"><div class="scada-blind-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="17" r="0.5"/></svg>DATA GAP: Foam / Bulking Events</div>
+    <div class="scada-blind-body">Last event: 12 days ago — Duration: ~6 hours<br>Cause: suspected filamentous growth <strong>(unconfirmed)</strong><br>Response: emergency antifoam + manual SVI check<br>Cost: ~€2,400 (antifoam + operator overtime)<br><br>⚠ Events logged reactively. No early warning system.</div>
+    <div class="scada-blind-overlay"></div></div>`;
+  }
+
+  // Status bar
+  h+=`<div class="statusbar" style="margin-top:6px"><div class="statusbar-item"><span class="status-led led-green"></span>PLC Online</div><div class="statusbar-item"><span class="status-led led-green"></span>SCADA Link</div><div class="statusbar-item"><span class="status-led led-amber"></span>Biology: NO DATA</div><div class="statusbar-item">Alarms: ${on?'0':'3'} active</div></div>`;
+
+  document.getElementById('scada').innerHTML=h;
+}
+
+const iconAlertCircle = (color) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+const iconAlertTriangle = (color) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+const iconCircleCheck = (color) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>`;
+
+function renderL(){
+  if(!on){document.getElementById('lir-inner').innerHTML='';return;}
+  let h=`<div class="lir-hdr"><div class="lir-dot"></div><span class="lir-txt">Lir Biological Intelligence</span><span class="live">LIVE</span></div>`;
+
+  // Critical alert — red, AlertCircle icon
+  h+=`<div class="la crit"><div class="la-icon">${iconAlertCircle('#dc2626')}</div><div class="la-content"><div class="la-t">SVI Projected to Exceed 150 in 48hrs</div><div class="la-d">Filamentous bacteria density +62% / 24h. Elongated filaments consistent with M. parvicella.</div><div class="la-a">⚡ Increase PAC to 8.5 g/L · Adjust DO to 2.3 mg/L</div></div></div>`;
+
+  // Warning alert — amber, AlertTriangle icon
+  h+=`<div class="la warn"><div class="la-icon">${iconAlertTriangle('#d97706')}</div><div class="la-content"><div class="la-t">Foam Risk ${lfm}% — Elevated</div><div class="la-d">Surface imaging detects foam precursors. Action within 12h.</div></div></div>`;
+
+  // Success alert — green, CircleCheck icon
+  h+=`<div class="la ok"><div class="la-icon">${iconCircleCheck('#16a34a')}</div><div class="la-content"><div class="la-t">NH₄-N Within Consent Limits</div><div class="la-d">Effluent ammonium at 2.81 mg/L — 1.19 mg/L below the 4 mg/L threshold.</div></div></div>`;
+
+  h+=`<div class="cc lb"><div class="cc-title">Filamentous Index <span class="badge b-alert">↑ 62% / 24h</span></div>${lchrt(fiD,'#dc2626',{threshold:40,thresholdLabel:'action threshold',yLabel:'FI'})}<div class="cc-note">Current: <span class="red">${lfi}</span> — Type 0092 / <em>M. parvicella</em></div></div>`;
+
+  h+=`<div class="cc lb"><div class="cc-title">SVI — Live + Forecast <span class="badge b-warn">150+ in 48h</span></div>${lchrt(svA,'#d97706',{threshold:150,thresholdLabel:'bulking threshold',forecastData:svF,showConfidence:true,yLabel:'mL/g'})}<div class="cc-note">Current: <strong>${lsvi}</strong> mL/g — +1.1/hr</div></div>`;
+
+  h+=`<div class="cc lb"><div class="cc-title">Floc Size Distribution</div>${lbar(fcD,'#2563eb')}<div class="cc-note">Median: <strong>125 µm</strong> — real-time via Lir imager</div></div>`;
+
+  h+=`<div class="cc lb"><div class="cc-title">Foam Risk <span class="badge b-warn">${lfm}%</span></div>${lchrt(fmD,'#ea580c',{threshold:70,thresholdLabel:'high risk',yLabel:'%',height:80})}</div>`;
+
+  h+=`<div class="recs"><div class="recs-t"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Recommendations</div>`;
+  h+=`<div class="ri"><div class="rn">1</div><div><div class="rm">PAC dosing: 6.0 → 8.5 g/L</div><div class="rs">FI stabilisation within 18h.</div></div></div>`;
+  h+=`<div class="ri"><div class="rn">2</div><div><div class="rm">DO setpoint: 1.9 → 2.3 mg/L (zones 3-4)</div><div class="rs">+€12/day energy vs €2,400 avoided foam event.</div></div></div>`;
+  h+=`<div class="ri"><div class="rn">3</div><div><div class="rm">Reduce SRT by 0.5 days</div><div class="rs">Selective pressure on filamentous organisms. NH₄ margin: 1.2 mg/L.</div></div></div>`;
+  h+='</div>';
+
+  document.getElementById('lir-inner').innerHTML=h;
+}
+
+setInterval(()=>{const n=new Date();document.getElementById('clock').textContent=n.toLocaleDateString()+' '+n.toLocaleTimeString();},1000);
+document.getElementById('clock').textContent=new Date().toLocaleDateString()+' '+new Date().toLocaleTimeString();
+renderS();
+</script>
+</body>
+</html>
