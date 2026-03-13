@@ -710,6 +710,7 @@ function openGuide(){
 setInterval(()=>{const n=new Date();document.getElementById('clock').textContent=n.toLocaleDateString()+' '+n.toLocaleTimeString();},1000);
 document.getElementById('clock').textContent=new Date().toLocaleDateString()+' '+new Date().toLocaleTimeString();
 renderS();
+window.addEventListener('load', openGuide);
 </script>
 </body>
 </html>
